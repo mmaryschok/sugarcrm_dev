@@ -274,8 +274,23 @@ class MysqliManager extends MysqlManager
 				$dbhost=substr($configOptions['db_host_name'],0,$pos);
 				$dbport=substr($configOptions['db_host_name'],$pos+1);
 			}
-
-			$this->database = mysqli_connect($dbhost,$configOptions['db_user_name'],$configOptions['db_password'],isset($configOptions['db_name'])?$configOptions['db_name']:'',$dbport);
+			
+			if ($this->getOption('ssl') == true) {
+				if (!empty($this->getOption('ssl_ca_cert_file_path'))) {
+                                        $this->database = mysqli_init();
+                                        mysqli_options($this->database, MYSQLI_OPT_SSL_VERIFY_SERVER_CERT, true);
+                                        mysqli_ssl_set($this->database, NULL, NULL, $this->getOption('ssl_ca_cert_file_path'), NULL, NULL);
+                                        $dbsuccess = mysqli_real_connect($this->database,$dbhost,$configOptions['db_user_name'],$configOptions['db_password'],isset($configOptions['db_name'])?$configOptions['db_name']:'',$dbport, NULL, MYSQLI_CLIENT_SSL);
+                                        if ($dbsuccess == false) {
+                                                $this->database = NULL;
+                                        }
+				} else {
+					$GLOBALS['log']->fatal("Could not connect to DB server ".$dbhost." with SSL=true in dbconfigoption and missing path to CA certificate file. Please add 'ssl_ca_cert_file_path' to dbconfigoption in config.php");
+				}
+			} else {
+				$this->database = mysqli_connect($dbhost,$configOptions['db_user_name'],$configOptions['db_password'],isset($configOptions['db_name'])?$configOptions['db_name']:'',$dbport);
+			}
+			
 			if(empty($this->database)) {
 				$GLOBALS['log']->fatal("Could not connect to DB server ".$dbhost." as ".$configOptions['db_user_name'].". port " .$dbport . ": " . mysqli_connect_error());
 				if($dieOnError) {
